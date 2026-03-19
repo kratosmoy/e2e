@@ -1,0 +1,31 @@
+plugins {
+    id 'java'
+}
+
+def cucumberVersion = '7.22.1'
+def junitPlatformVersion = '1.12.2'
+def junitJupiterVersion = '5.12.2'
+
+dependencies {
+    testImplementation project(':core')
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+    testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+}
+
+test {
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    systemProperty 'cucumber.plugin', System.getProperty(
+            'cucumber.plugin',
+            'pretty,summary,html:build/reports/cucumber/cucumber.html,json:build/reports/cucumber/cucumber.json'
+    )
+    systemProperty 'cucumber.glue', System.getProperty(
+            'cucumber.glue',
+            'com.example.e2e.core.hooks,com.example.e2e.tests.steps'
+    )
+    systemProperty 'cucumber.features', System.getProperty(
+            'cucumber.features',
+            'src/test/resources/features'
+    )
+}
