@@ -20,6 +20,8 @@
 └── test-suite
     ├── src/test/java/com/example/e2e/tests
     │   ├── runner
+    │   │   ├── CommonRunCucumberTest.java
+    │   │   └── demoapp
     │   └── steps
     │       ├── common
     │       └── demoapp
@@ -34,16 +36,17 @@
 
 核心模块提供：
 
-- `FrameworkConfig`：通过系统参数统一管理 `base.url`、`browser`、`headless` 等配置。
+- `FrameworkConfig`：通过系统参数统一管理 `base.url`、`browser`、`headless`、本地浏览器模式等配置。
 - `PlaywrightFactory` / `PlaywrightManager`：负责浏览器、上下文、页面生命周期管理。
 - `ScenarioContext`：支持在 step definitions 间共享场景级数据。
-- `CucumberHooks`：在场景前后自动创建 session、失败截图并输出 trace。
+- `CucumberHooks`：在场景前后自动创建 session、失败截图并输出 trace，同时把失败产物挂到 Allure。
 
 ### `test-suite`
 
 测试模块提供：
 
-- `RunCucumberTest`：JUnit Platform + Cucumber 统一入口。
+- `CommonRunCucumberTest`、`DemoAppRunCucumberTest`：按 area / app 拆分的显式执行入口。
+- `RunCucumberTest`：默认的全量执行入口类，用于 Gradle `test` 和直接 JUnit 运行。
 - `steps/common`：跨应用可复用的通用步骤。
 - `steps/demoapp`：按业务 app 拆分的步骤定义。
 - `features/common`、`features/demoapp`：按应用拆分 feature 文件。
@@ -58,19 +61,46 @@
 gradle wrapper
 ```
 
-### 2. 安装 Playwright 浏览器
+### 2. Playwright 浏览器模式
+
+默认情况下：
+
+- Windows 会自动启用“本地浏览器模式”，并设置 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`
+- 在 `browser=chromium` 且未显式指定路径时，默认走本机 `msedge`
+- Linux / macOS 仍保持 Playwright 默认行为，可继续使用下载的浏览器
+
+Windows 下常用启动方式：
 
 ```bash
-./gradlew :test-suite:playwright --help
+./gradlew :test-suite:testDemoApp
 ```
 
-> 实际首次执行测试时，Playwright Java 会自动下载所需浏览器；如果 CI 需要预装浏览器，也可以在镜像阶段准备缓存。
+如果要显式指定本地浏览器：
+
+```bash
+./gradlew :test-suite:testDemoApp \
+  -Dplaywright.use.local.browser=true \
+  -Dbrowser=chromium \
+  -Dbrowser.channel=chrome
+```
+
+或者：
+
+```bash
+./gradlew :test-suite:testDemoApp \
+  -Dplaywright.use.local.browser=true \
+  -Dbrowser.executable.path="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+```
+
+如果你希望在非 Windows 环境也复用本地浏览器模式，可以显式传入 `-Dplaywright.use.local.browser=true`。
 
 ### 3. 运行所有 E2E 用例
 
 ```bash
 ./gradlew clean test
 ```
+
+> `test` 是标准 Gradle `Test` 任务，会直接执行全量 runner：`RunCucumberTest`。
 
 ### 4. 传入运行参数
 
@@ -82,17 +112,86 @@ gradle wrapper
   -Dslowmo=0
 ```
 
-### 5. 只运行某个 app 的 features
+### 5. 只运行某个 area / app
 
 ```bash
-./gradlew :test-suite:test -Dcucumber.features=src/test/resources/features/demoapp
+./gradlew :test-suite:testCommon
+./gradlew :test-suite:testDemoApp
 ```
+
+这些 task 会分别执行自己的 area runner，并输出独立的报告与产物目录。
+
+### 6. 显式聚合执行所有 area
+
+```bash
+./gradlew :test-suite:testAllApps
+```
+
+### 7. 生成 Allure 报告
+
+```bash
+./gradlew :test-suite:allureReport
+./gradlew :test-suite:allureServe
+```
+
+`allureReport` / `allureServe` 会先执行 `testAllApps`，然后基于 Allure results 生成或打开报告。
+
+### 8. 在 IntelliJ + Cucumber+ 中使用
+
+如果你在 IntelliJ IDEA 里安装了 `Cucumber+` plugin，推荐按下面的方式使用：
+
+1. 先用 Gradle 导入项目，确认 `test-suite/src/test/resources/features/` 下的 `.feature` 文件和 `test-suite/src/test/java/com/example/e2e/tests/steps/` 下的 step definitions 都已被 IDE 正确索引。
+2. 打开任意 `.feature` 文件后，可以直接使用 `Cucumber+` 提供的跳转、查找 step definition、scenario 导航等能力。
+3. 如果你只想快速跑当前 scenario 或当前 feature，可以直接在 `.feature` 文件里用 gutter run icon 启动。
+4. 如果你想稳定地按 area 跑，优先在 IntelliJ 里直接运行对应的 runner class。
+
+```text
+test-suite/src/test/java/com/example/e2e/tests/runner/CommonRunCucumberTest.java
+test-suite/src/test/java/com/example/e2e/tests/runner/demoapp/DemoAppRunCucumberTest.java
+test-suite/src/test/java/com/example/e2e/tests/runner/RunCucumberTest.java
+```
+
+5. `CommonRunCucumberTest` 用于 shared/common area，`DemoAppRunCucumberTest` 用于 demoapp，`RunCucumberTest` 用于全量执行。
+6. 如果需要传环境参数，在 IntelliJ 的 Run Configuration 里加 VM options，常用示例：
+
+```text
+-Dbase.url=https://playwright.dev -Dbrowser=chromium -Dheadless=false -Dslowmo=200
+```
+
+7. Windows 下如果希望强制走本地浏览器模式，可以在 VM options 里加：
+
+```text
+-Dplaywright.use.local.browser=true -Dbrowser=chromium -Dbrowser.channel=chrome
+```
+
+或者：
+
+```text
+-Dplaywright.use.local.browser=true -Dbrowser.executable.path=C:\Program Files\Google\Chrome\Application\chrome.exe
+```
+
+8. 如果是直接从 `.feature` 文件发起运行，项目会使用 `junit-platform.properties` 里的默认 Cucumber 配置；如果你需要更明确的执行边界，优先运行对应的 runner class。
+9. IntelliJ 里的运行结束后，Allure 原始结果仍然会落到 `test-suite/build/allure-results/`。如果要看完整报告，继续在终端执行：
+
+```bash
+./gradlew :test-suite:allureServe
+```
+
+## 产物输出
+
+- `test-suite/build/artifacts/common/`
+- `test-suite/build/artifacts/demoapp/`
+- `test-suite/build/allure-results/`
+
+这样可以避免不同 area 在分任务执行时互相覆盖浏览器产物，同时统一由 Allure 汇总测试结果。
 
 ## 扩展建议
 
 新增 app 时，建议同步创建：
 
 - `test-suite/src/test/java/com/example/e2e/tests/steps/<app-name>/`
+- `test-suite/src/test/java/com/example/e2e/tests/runner/<app-name>/`
 - `test-suite/src/test/resources/features/<app-name>/`
+- `test-suite/build.gradle` 中的 app-specific `Test` task
 
-这样可以让 step definitions 与 features 保持一致的业务边界。
+详细步骤见 [docs/new-app-onboarding.md](/home/kratos/projects/e2e/docs/new-app-onboarding.md)。

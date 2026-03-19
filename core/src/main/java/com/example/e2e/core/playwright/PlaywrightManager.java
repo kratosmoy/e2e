@@ -15,8 +15,8 @@ public final class PlaywrightManager {
     private PlaywrightManager() {
     }
 
-    public static void start(String scenarioName) {
-        SESSION.set(FACTORY.createSession(scenarioName));
+    public static void start(String scenarioArtifactId) {
+        SESSION.set(FACTORY.createSession(scenarioArtifactId));
     }
 
     public static Page page() {

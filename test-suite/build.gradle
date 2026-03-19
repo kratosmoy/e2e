@@ -1,31 +1,147 @@
 plugins {
     id 'java'
+    id 'io.qameta.allure' version '3.0.2'
 }
 
 def cucumberVersion = '7.22.1'
 def junitPlatformVersion = '1.12.2'
 def junitJupiterVersion = '5.12.2'
+def allureVersion = rootProject.ext.allureVersion
+def isWindows = System.getProperty('os.name', '').toLowerCase().contains('win')
+def forwardedSystemProperties = [
+        'base.url',
+        'browser',
+        'browser.channel',
+        'browser.executable.path',
+        'headless',
+        'slowmo',
+        'playwright.use.local.browser',
+        'cucumber.filter.tags',
+        'cucumber.filter.name'
+]
+def cucumberAreas = [
+        common : [
+                taskName       : 'testCommon',
+                runnerClassName: 'com.example.e2e.tests.runner.CommonRunCucumberTest',
+                glue           : [
+                        'com.example.e2e.core.hooks',
+                        'com.example.e2e.tests.steps.common'
+                ],
+                parallelEnabled: false,
+                parallelism    : 1
+        ],
+        demoapp: [
+                taskName       : 'testDemoApp',
+                runnerClassName: 'com.example.e2e.tests.runner.demoapp.DemoAppRunCucumberTest',
+                glue           : [
+                        'com.example.e2e.core.hooks',
+                        'com.example.e2e.tests.steps.common',
+                        'com.example.e2e.tests.steps.demoapp'
+                ],
+                parallelEnabled: false,
+                parallelism    : 1
+        ]
+]
 
 dependencies {
+    testImplementation platform("io.qameta.allure:allure-bom:${allureVersion}")
     testImplementation project(':core')
+    testImplementation "io.qameta.allure:allure-cucumber7-jvm"
+    testImplementation "io.qameta.allure:allure-junit-platform"
     testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
     testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
     testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
 }
 
+def cucumberPluginValue = {
+    'pretty,summary,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm'
+}
+
+def localBrowserModeEnabled = {
+    Boolean.parseBoolean(System.getProperty('playwright.use.local.browser', Boolean.toString(isWindows)))
+}
+
+def configureSharedRuntime = { Test task, String artifactsRoot ->
+    task.systemProperty 'artifacts.dir', artifactsRoot
+    task.systemProperty 'cucumber.plugin', cucumberPluginValue()
+    task.systemProperty 'playwright.use.local.browser', localBrowserModeEnabled().toString()
+    task.systemProperty 'allure.results.directory', layout.buildDirectory.dir('allure-results').get().asFile.absolutePath
+
+    if (localBrowserModeEnabled()) {
+        task.environment 'PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD', '1'
+    }
+}
+
+def configureAreaTestTask = { Test task, String areaName, Map<String, ?> areaConfig ->
+    task.group = 'verification'
+    task.description = "Runs the ${areaName} Cucumber area."
+    task.testClassesDirs = sourceSets.test.output.classesDirs
+    task.classpath = sourceSets.test.runtimeClasspath
+
+    task.filter {
+        includeTestsMatching(areaConfig.runnerClassName)
+        failOnNoMatchingTests = true
+    }
+
+    task.systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    task.systemProperty 'cucumber.glue', areaConfig.glue.join(',')
+    task.systemProperty 'cucumber.execution.parallel.enabled', areaConfig.parallelEnabled.toString()
+    configureSharedRuntime(task, layout.buildDirectory.dir("artifacts/${areaName}").get().asFile.absolutePath)
+
+    forwardedSystemProperties.each { propertyName ->
+        def propertyValue = System.getProperty(propertyName)
+        if (propertyValue != null) {
+            task.systemProperty propertyName, propertyValue
+        }
+    }
+
+    if (areaConfig.parallelEnabled) {
+        task.systemProperty 'cucumber.execution.parallel.config.strategy', 'fixed'
+        task.systemProperty 'cucumber.execution.parallel.config.fixed.parallelism', areaConfig.parallelism.toString()
+    }
+}
+
+cucumberAreas.each { areaName, areaConfig ->
+    tasks.register(areaConfig.taskName, Test) { task ->
+        configureAreaTestTask(task, areaName, areaConfig)
+    }
+}
+
+tasks.register('testAllApps') {
+    group = 'verification'
+    description = 'Runs all area-specific Cucumber tasks.'
+    dependsOn cucumberAreas.collect { tasks.named(it.value.taskName) }
+}
+
+tasks.named('testDemoApp') {
+    shouldRunAfter tasks.named('testCommon')
+}
+
+tasks.named('allureReport') {
+    dependsOn tasks.named('testAllApps')
+}
+
+tasks.named('allureServe') {
+    dependsOn tasks.named('testAllApps')
+}
+
 test {
-    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
-    systemProperty 'cucumber.plugin', System.getProperty(
-            'cucumber.plugin',
-            'pretty,summary,html:build/reports/cucumber/cucumber.html,json:build/reports/cucumber/cucumber.json'
-    )
-    systemProperty 'cucumber.glue', System.getProperty(
-            'cucumber.glue',
-            'com.example.e2e.core.hooks,com.example.e2e.tests.steps'
-    )
-    systemProperty 'cucumber.features', System.getProperty(
-            'cucumber.features',
-            'src/test/resources/features'
-    )
+    description = 'Runs the full Cucumber test suite.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    filter {
+        includeTestsMatching('com.example.e2e.tests.runner.RunCucumberTest')
+        failOnNoMatchingTests = true
+    }
+
+    configureSharedRuntime(delegate, layout.buildDirectory.dir('artifacts/all').get().asFile.absolutePath)
+
+    forwardedSystemProperties.each { propertyName ->
+        def propertyValue = System.getProperty(propertyName)
+        if (propertyValue != null) {
+            systemProperty propertyName, propertyValue
+        }
+    }
 }

@@ -6,6 +6,7 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.Tracing;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,22 +19,35 @@ public class PlaywrightFactory {
         this.config = Objects.requireNonNull(config, "config must not be null");
     }
 
-    public PlaywrightSession createSession(String scenarioName) {
+    public PlaywrightSession createSession(String scenarioArtifactId) {
         ensureDirectories(config.tracesDir(), config.screenshotsDir(), config.videosDir());
 
         Playwright playwright = Playwright.create();
+        BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
+                .setHeadless(config.headless())
+                .setSlowMo((double) config.slowMo());
+
+        if (config.browserChannel() != null) {
+            if (!"chromium".equalsIgnoreCase(config.browser())) {
+                throw new IllegalStateException("browser.channel is only supported when browser=chromium");
+            }
+            launchOptions.setChannel(config.browserChannel());
+        }
+
+        if (config.browserExecutablePath() != null) {
+            launchOptions.setExecutablePath(config.browserExecutablePath());
+        }
+
         Browser browser = browserType(playwright)
-                .launch(new BrowserType.LaunchOptions()
-                        .setHeadless(config.headless())
-                        .setSlowMo((double) config.slowMo()));
+                .launch(launchOptions);
 
         Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
                 .setBaseURL(config.baseUrl())
-                .setRecordVideoDir(config.videosDir().resolve(sanitize(scenarioName)))
+                .setRecordVideoDir(config.videosDir().resolve(scenarioArtifactId))
                 .setViewportSize(1440, 900);
 
         BrowserContext context = browser.newContext(contextOptions);
-        context.tracing().start(new BrowserContext.Tracing.StartOptions()
+        context.tracing().start(new Tracing.StartOptions()
                 .setScreenshots(true)
                 .setSnapshots(true)
                 .setSources(true));
@@ -59,9 +73,5 @@ public class PlaywrightFactory {
                 throw new IllegalStateException("Unable to create directory: " + path, exception);
             }
         }
-    }
-
-    private String sanitize(String value) {
-        return value.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
     }
 }
