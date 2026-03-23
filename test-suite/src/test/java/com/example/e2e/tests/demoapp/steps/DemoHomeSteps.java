@@ -1,14 +1,14 @@
-package com.example.e2e.tests.steps.demoapp;
+package com.example.e2e.tests.demoapp.steps;
 
-import com.example.e2e.core.playwright.PlaywrightManager;
+import com.example.e2e.core.steps.PlaywrightStepsSupport;
 import io.cucumber.java.en.Then;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class DemoHomeSteps {
+public class DemoHomeSteps extends PlaywrightStepsSupport {
     @Then("the get started link should be visible")
     public void theGetStartedLinkShouldBeVisible() {
-        boolean visible = PlaywrightManager.page()
+        boolean visible = page()
                 .locator("text=Get started")
                 .first()
                 .isVisible();
