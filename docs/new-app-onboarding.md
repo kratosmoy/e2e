@@ -104,6 +104,7 @@ adminapp: [
 如果要生成 Allure 报告：
 
 ```bash
+./gradlew :test-suite:allureDownload
 ./gradlew :test-suite:testAdminApp
 ./gradlew :test-suite:allureReport
 ```
@@ -115,6 +116,8 @@ adminapp: [
 ```
 
 注意：当前 `allureReport` / `allureServe` 默认会依赖 `testAllApps`。如果你只想看单个 app 的结果，先执行一次 `clean`，再只跑该 app task，然后再生成报告。
+
+`allureDownload` 会由 Gradle 自动下载 `allure-commandline`，因此不需要额外安装本地 `allure-generator` 包。
 
 ## 7. 本地浏览器约定
 

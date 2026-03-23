@@ -42,6 +42,14 @@ dependencies {
     testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
     testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    allureCommandline "io.qameta.allure:allure-commandline:${allureVersion}@zip"
+}
+
+allure {
+    version.set(allureVersion)
+    adapter {
+        allureJavaVersion.set(allureVersion)
+    }
 }
 
 def cucumberPluginValue = {
@@ -112,10 +120,12 @@ tasks.register('testAllApps') {
 }
 
 tasks.named('allureReport') {
+    dependsOn tasks.named('allureDownload')
     dependsOn tasks.named('testAllApps')
 }
 
 tasks.named('allureServe') {
+    dependsOn tasks.named('allureDownload')
     dependsOn tasks.named('testAllApps')
 }
 

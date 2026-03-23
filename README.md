@@ -126,11 +126,14 @@ Windows 下常用启动方式：
 ### 7. 生成 Allure 报告
 
 ```bash
+./gradlew :test-suite:allureDownload
 ./gradlew :test-suite:allureReport
 ./gradlew :test-suite:allureServe
 ```
 
-`allureReport` / `allureServe` 会先执行 `testAllApps`，然后基于 Allure results 生成或打开报告。
+`allureDownload` 会通过 Gradle 从 Maven Central 下载 `allure-commandline`，因此不需要手动安装本地 `allure-generator` / Allure CLI 包。
+
+`allureReport` / `allureServe` 现在会先确保 `allure-commandline` 已下载，再执行 `testAllApps`，然后基于 Allure results 生成或打开报告。
 
 ### 8. 在 IntelliJ + Cucumber+ 中使用
 
