@@ -1,4 +1,4 @@
-package com.example.e2e.tests.steps.common;
+package com.example.e2e.tests.steps.demoapp;
 
 import com.example.e2e.core.playwright.PlaywrightManager;
 import io.cucumber.java.en.Given;
@@ -6,7 +6,7 @@ import io.cucumber.java.en.Then;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class CommonNavigationSteps {
+public class DemoNavigationSteps {
     @Given("the user opens the relative path {string}")
     public void theUserOpensTheRelativePath(String path) {
         PlaywrightManager.page().navigate(path);

@@ -20,13 +20,10 @@
 └── test-suite
     ├── src/test/java/com/example/e2e/tests
     │   ├── runner
-    │   │   ├── CommonRunCucumberTest.java
     │   │   └── demoapp
     │   └── steps
-    │       ├── common
     │       └── demoapp
     └── src/test/resources/features
-        ├── common
         └── demoapp
 ```
 
@@ -45,11 +42,10 @@
 
 测试模块提供：
 
-- `CommonRunCucumberTest`、`DemoAppRunCucumberTest`：按 area / app 拆分的显式执行入口。
+- `DemoAppRunCucumberTest`：按 app 拆分的显式执行入口。
 - `RunCucumberTest`：默认的全量执行入口类，用于 Gradle `test` 和直接 JUnit 运行。
-- `steps/common`：跨应用可复用的通用步骤。
-- `steps/demoapp`：按业务 app 拆分的步骤定义。
-- `features/common`、`features/demoapp`：按应用拆分 feature 文件。
+- `steps/demoapp`：demoapp 自己维护导航、断言等步骤定义。
+- `features/demoapp`：demoapp 自己维护的 feature 文件。
 
 ## 运行方式
 
@@ -65,9 +61,10 @@ gradle wrapper
 
 默认情况下：
 
-- Windows 会自动启用“本地浏览器模式”，并设置 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`
+- 所有环境都会默认启用“本地浏览器模式”，并设置 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`
 - 在 `browser=chromium` 且未显式指定路径时，默认走本机 `msedge`
-- Linux / macOS 仍保持 Playwright 默认行为，可继续使用下载的浏览器
+- Linux 环境默认直接跳过这些 E2E task，避免在 CI 或开发机上误跑本地浏览器模式
+- macOS 如需覆盖默认行为，仍可通过系统参数显式指定 channel 或 executable path
 
 Windows 下常用启动方式：
 
@@ -92,8 +89,6 @@ Windows 下常用启动方式：
   -Dbrowser.executable.path="C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 ```
 
-如果你希望在非 Windows 环境也复用本地浏览器模式，可以显式传入 `-Dplaywright.use.local.browser=true`。
-
 ### 3. 运行所有 E2E 用例
 
 ```bash
@@ -112,16 +107,15 @@ Windows 下常用启动方式：
   -Dslowmo=0
 ```
 
-### 5. 只运行某个 area / app
+### 5. 只运行某个 app
 
 ```bash
-./gradlew :test-suite:testCommon
 ./gradlew :test-suite:testDemoApp
 ```
 
-这些 task 会分别执行自己的 area runner，并输出独立的报告与产物目录。
+这些 task 会执行自己的 app runner，并输出独立的报告与产物目录。
 
-### 6. 显式聚合执行所有 area
+### 6. 显式聚合执行所有 app
 
 ```bash
 ./gradlew :test-suite:testAllApps
@@ -143,15 +137,14 @@ Windows 下常用启动方式：
 1. 先用 Gradle 导入项目，确认 `test-suite/src/test/resources/features/` 下的 `.feature` 文件和 `test-suite/src/test/java/com/example/e2e/tests/steps/` 下的 step definitions 都已被 IDE 正确索引。
 2. 打开任意 `.feature` 文件后，可以直接使用 `Cucumber+` 提供的跳转、查找 step definition、scenario 导航等能力。
 3. 如果你只想快速跑当前 scenario 或当前 feature，可以直接在 `.feature` 文件里用 gutter run icon 启动。
-4. 如果你想稳定地按 area 跑，优先在 IntelliJ 里直接运行对应的 runner class。
+4. 如果你想稳定地按 app 跑，优先在 IntelliJ 里直接运行对应的 runner class。
 
 ```text
-test-suite/src/test/java/com/example/e2e/tests/runner/CommonRunCucumberTest.java
 test-suite/src/test/java/com/example/e2e/tests/runner/demoapp/DemoAppRunCucumberTest.java
 test-suite/src/test/java/com/example/e2e/tests/runner/RunCucumberTest.java
 ```
 
-5. `CommonRunCucumberTest` 用于 shared/common area，`DemoAppRunCucumberTest` 用于 demoapp，`RunCucumberTest` 用于全量执行。
+5. `DemoAppRunCucumberTest` 用于 demoapp，`RunCucumberTest` 用于全量执行。
 6. 如果需要传环境参数，在 IntelliJ 的 Run Configuration 里加 VM options，常用示例：
 
 ```text
@@ -179,11 +172,10 @@ test-suite/src/test/java/com/example/e2e/tests/runner/RunCucumberTest.java
 
 ## 产物输出
 
-- `test-suite/build/artifacts/common/`
 - `test-suite/build/artifacts/demoapp/`
 - `test-suite/build/allure-results/`
 
-这样可以避免不同 area 在分任务执行时互相覆盖浏览器产物，同时统一由 Allure 汇总测试结果。
+这样可以避免不同 app 在分任务执行时互相覆盖浏览器产物，同时统一由 Allure 汇总测试结果。
 
 ## 扩展建议
 
