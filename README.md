@@ -59,6 +59,18 @@
 gradle wrapper
 ```
 
+如果你在内网环境里无法直连 Maven Central，可以在执行 Gradle 时显式指定公司 Maven 代理 / 镜像：
+
+```bash
+./gradlew test -Dmaven.repo.url=https://your-internal-maven.example.com/repository/maven-public/
+```
+
+也可以通过环境变量：
+
+```bash
+export MAVEN_REPO_URL=https://your-internal-maven.example.com/repository/maven-public/
+```
+
 ### 2. Playwright 浏览器模式
 
 默认情况下：
@@ -131,9 +143,16 @@ Windows 下常用启动方式：
 ./gradlew :test-suite:allureServe
 ```
 
-`allureDownload` 会通过 Gradle 从 Maven Central 下载 `allure-commandline`，因此不需要手动安装本地 `allure-generator` / Allure CLI 包。
+`allureDownload` 现在只检查本机是否已经有可用的 Allure CLI，不会再尝试联网下载 `allure-generator` / `allure-commandline`。
 
-`allureReport` / `allureServe` 现在会先确保 `allure-commandline` 已下载，再执行 `testAllApps`，然后基于 Allure results 生成或打开报告。
+这意味着：
+
+- 运行测试本身**不需要** `allure-generator` / `allure-commandline`
+- 只有在执行 `allureReport` / `allureServe` 时，才需要本机提前提供 Allure CLI
+- 可以通过 `-Dallure.commandline=/path/to/allure`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 指定 CLI 路径
+- 如果依赖仓库也走内网镜像，可以同时使用 `-Dmaven.repo.url=...` 或 `MAVEN_REPO_URL`
+
+`allureReport` / `allureServe` 会先执行 `testAllApps`，然后在检测到本地 Allure CLI 时基于 Allure results 生成或打开报告。
 
 ### 8. 在 IntelliJ + Cucumber+ 中使用
 

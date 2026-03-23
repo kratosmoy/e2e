@@ -2,12 +2,21 @@ ext {
     allureVersion = '2.32.0'
 }
 
+def customMavenRepoUrl = System.getProperty('maven.repo.url') ?: System.getenv('MAVEN_REPO_URL')
+
 allprojects {
     group = 'com.example.e2e'
     version = '1.0.0-SNAPSHOT'
 
     repositories {
-        mavenCentral()
+        if (customMavenRepoUrl) {
+            maven {
+                url = uri(customMavenRepoUrl)
+                allowInsecureProtocol = customMavenRepoUrl.startsWith('http://')
+            }
+        } else {
+            mavenCentral()
+        }
     }
 }
 

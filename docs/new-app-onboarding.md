@@ -101,6 +101,13 @@ adminapp: [
 ./gradlew :test-suite:testAdminApp
 ```
 
+如果仓库运行在内网环境，且依赖需要通过公司 Maven 镜像拉取，可以加上：
+
+```bash
+./gradlew :test-suite:testAdminApp \
+  -Dmaven.repo.url=https://your-internal-maven.example.com/repository/maven-public/
+```
+
 如果要生成 Allure 报告：
 
 ```bash
@@ -117,7 +124,9 @@ adminapp: [
 
 注意：当前 `allureReport` / `allureServe` 默认会依赖 `testAllApps`。如果你只想看单个 app 的结果，先执行一次 `clean`，再只跑该 app task，然后再生成报告。
 
-`allureDownload` 会由 Gradle 自动下载 `allure-commandline`，因此不需要额外安装本地 `allure-generator` 包。
+`allureDownload` 现在只检查本机是否已经有可用的 Allure CLI，不会自动联网下载 `allure-generator` / `allure-commandline`。
+
+运行测试本身不依赖 Allure CLI；只有在执行 `allureReport` / `allureServe` 时，才需要通过 `-Dallure.commandline`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 提供本地 CLI。若依赖下载也要走内网镜像，可同时配置 `-Dmaven.repo.url` 或 `MAVEN_REPO_URL`。
 
 ## 7. 本地浏览器约定
 
