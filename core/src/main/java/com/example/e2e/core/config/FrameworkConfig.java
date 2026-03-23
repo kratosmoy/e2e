@@ -21,7 +21,7 @@ public record FrameworkConfig(
         String browser = System.getProperty("browser", "chromium");
         boolean windows = isWindows();
         boolean useLocalBrowser = Boolean.parseBoolean(
-                System.getProperty("playwright.use.local.browser", Boolean.toString(windows))
+                System.getProperty("playwright.use.local.browser", "true")
         );
         String browserChannel = System.getProperty("browser.channel");
         String browserExecutablePath = System.getProperty("browser.executable.path");
