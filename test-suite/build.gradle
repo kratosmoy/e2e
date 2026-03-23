@@ -7,7 +7,8 @@ def cucumberVersion = '7.22.1'
 def junitPlatformVersion = '1.12.2'
 def junitJupiterVersion = '5.12.2'
 def allureVersion = rootProject.ext.allureVersion
-def isWindows = System.getProperty('os.name', '').toLowerCase().contains('win')
+def osName = System.getProperty('os.name', '').toLowerCase()
+def isLinux = osName.contains('linux')
 def forwardedSystemProperties = [
         'base.url',
         'browser',
@@ -20,23 +21,12 @@ def forwardedSystemProperties = [
         'cucumber.filter.name'
 ]
 def cucumberAreas = [
-        common : [
-                taskName       : 'testCommon',
-                runnerClassName: 'com.example.e2e.tests.runner.CommonRunCucumberTest',
-                glue           : [
-                        'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common'
-                ],
-                parallelEnabled: false,
-                parallelism    : 1
-        ],
         demoapp: [
                 taskName       : 'testDemoApp',
-                runnerClassName: 'com.example.e2e.tests.runner.demoapp.DemoAppRunCucumberTest',
+                runnerClassName: 'com.example.e2e.tests.demoapp.runner.DemoAppRunCucumberTest',
                 glue           : [
                         'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common',
-                        'com.example.e2e.tests.steps.demoapp'
+                        'com.example.e2e.tests.demoapp.steps'
                 ],
                 parallelEnabled: false,
                 parallelism    : 1
@@ -59,7 +49,7 @@ def cucumberPluginValue = {
 }
 
 def localBrowserModeEnabled = {
-    Boolean.parseBoolean(System.getProperty('playwright.use.local.browser', Boolean.toString(isWindows)))
+    Boolean.parseBoolean(System.getProperty('playwright.use.local.browser', 'true'))
 }
 
 def configureSharedRuntime = { Test task, String artifactsRoot ->
@@ -100,6 +90,13 @@ def configureAreaTestTask = { Test task, String areaName, Map<String, ?> areaCon
         task.systemProperty 'cucumber.execution.parallel.config.strategy', 'fixed'
         task.systemProperty 'cucumber.execution.parallel.config.fixed.parallelism', areaConfig.parallelism.toString()
     }
+
+    if (isLinux) {
+        task.onlyIf {
+            logger.lifecycle("Skipping ${task.path} because local-browser mode is the default and Linux execution is disabled.")
+            false
+        }
+    }
 }
 
 cucumberAreas.each { areaName, areaConfig ->
@@ -112,10 +109,6 @@ tasks.register('testAllApps') {
     group = 'verification'
     description = 'Runs all area-specific Cucumber tasks.'
     dependsOn cucumberAreas.collect { tasks.named(it.value.taskName) }
-}
-
-tasks.named('testDemoApp') {
-    shouldRunAfter tasks.named('testCommon')
 }
 
 tasks.named('allureReport') {
@@ -142,6 +135,13 @@ test {
         def propertyValue = System.getProperty(propertyName)
         if (propertyValue != null) {
             systemProperty propertyName, propertyValue
+        }
+    }
+
+    if (isLinux) {
+        onlyIf {
+            logger.lifecycle("Skipping ${path} because local-browser mode is the default and Linux execution is disabled.")
+            false
         }
     }
 }
