@@ -6,6 +6,7 @@ import java.util.Locale;
 
 public record FrameworkConfig(
         String baseUrl,
+        String environment,
         boolean headless,
         int slowMo,
         String browser,
@@ -21,12 +22,13 @@ public record FrameworkConfig(
         String browser = System.getProperty("browser", "chromium");
         boolean windows = isWindows();
         boolean useLocalBrowser = Boolean.parseBoolean(
-                System.getProperty("playwright.use.local.browser", Boolean.toString(windows))
+                System.getProperty("playwright.use.local.browser", "true")
         );
         String browserChannel = System.getProperty("browser.channel");
         String browserExecutablePath = System.getProperty("browser.executable.path");
         return new FrameworkConfig(
                 System.getProperty("base.url", "https://playwright.dev"),
+                System.getProperty("test.env", "dev"),
                 Boolean.parseBoolean(System.getProperty("headless", "true")),
                 Integer.getInteger("slowmo", 0),
                 browser,
@@ -37,6 +39,20 @@ public record FrameworkConfig(
                 artifactsRoot.resolve("screenshots"),
                 artifactsRoot.resolve("videos")
         );
+    }
+
+    public String homePageUrl(String appName) {
+        String envSpecific = System.getProperty("homepage.%s.%s".formatted(appName, environment));
+        if (hasText(envSpecific)) {
+            return envSpecific;
+        }
+
+        String appDefault = System.getProperty("homepage.%s".formatted(appName));
+        if (hasText(appDefault)) {
+            return appDefault;
+        }
+
+        return baseUrl;
     }
 
     private static Path toPath(String value) {

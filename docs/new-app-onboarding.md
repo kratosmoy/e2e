@@ -9,27 +9,27 @@
 新增 feature 目录：
 
 ```text
-test-suite/src/test/resources/features/adminapp/
+test-suite/src/test/resources/apps/adminapp/features/
 ```
 
 新增 step definitions 目录：
 
 ```text
-test-suite/src/test/java/com/example/e2e/tests/steps/adminapp/
+test-suite/src/test/java/com/example/e2e/tests/adminapp/steps/
 ```
 
 新增 runner 目录和类：
 
 ```text
-test-suite/src/test/java/com/example/e2e/tests/runner/adminapp/AdminAppRunCucumberTest.java
+test-suite/src/test/java/com/example/e2e/tests/adminapp/runner/AdminAppRunCucumberTest.java
 ```
 
 ## 2. 新增 runner
 
-参考 `demoapp` 的做法，新增一个只绑定自己 area 的 runner：
+参考 `demoapp` 的做法，新增一个只绑定自己 app 目录的 runner：
 
 ```java
-package com.example.e2e.tests.runner.adminapp;
+package com.example.e2e.tests.adminapp.runner;
 
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectClasspathResource;
@@ -37,7 +37,7 @@ import org.junit.platform.suite.api.Suite;
 
 @Suite
 @IncludeEngines("cucumber")
-@SelectClasspathResource("features/adminapp")
+@SelectClasspathResource("apps/adminapp/features")
 public class AdminAppRunCucumberTest {
 }
 ```
@@ -47,27 +47,28 @@ public class AdminAppRunCucumberTest {
 - runner 只负责声明自己的 feature scope。
 - 不要把业务逻辑写进 runner。
 - glue、Allure、artifacts、parallel 这类运行时配置放在 `test-suite/build.gradle`。
+- 每个 app runner 要配置自己独立的 glue（`core.hooks + 自己的 steps`），这样不同 app 即使存在相同文案的步骤，也不会在全量执行时触发 duplicate step definition。
 
 ## 3. 新增 feature 文件
 
-在 `features/adminapp/` 下新增 `.feature` 文件。
+在 `apps/adminapp/features/` 下新增 `.feature` 文件。
 
 建议：
 
 - feature 目录按 app 划分。
-- 跨 app 复用的 feature 保持放在 `features/common/`。
-- 场景名保持稳定、可读，避免同一 area 下大量重名 scenario。
+- 不再单独维护 `features/common/`，公共行为应放回各自 app 目录，保证每个 app 自己拥有完整测试资产。
+- 场景名保持稳定、可读，避免同一 app area 下大量重名 scenario。
 
 ## 4. 新增 step definitions
 
-在 `steps/adminapp/` 下新增 step class。
+在 `tests/adminapp/steps/` 下新增 step class。
 
 建议：
 
 - app 专属步骤放在自己的包下。
-- 跨 app 公共步骤放在 `steps/common/`。
-- step 内统一通过 `PlaywrightManager.page()` 访问 Playwright 页面对象。
-- 需要跨 step 共享数据时，使用 `PlaywrightManager.scenarioContext()`。
+- 不再单独维护 `steps/common/`，如果出现可复用行为，优先在 app 内保持清晰边界，只有真正框架级能力才下沉到 `core`。
+- step 内优先继承 `PlaywrightStepsSupport`，直接使用 `page()` / `scenarioContext()` 访问共享会话对象。
+- 不要在 step 文件里定义 static 全局 `Page` 变量；会话仍应由 `CucumberHooks` + `PlaywrightManager` 按 scenario 生命周期托管。
 
 ## 5. 在 Gradle 注册新的 area task
 
@@ -76,11 +77,10 @@ public class AdminAppRunCucumberTest {
 ```groovy
 adminapp: [
         taskName       : 'testAdminApp',
-        runnerClassName: 'com.example.e2e.tests.runner.adminapp.AdminAppRunCucumberTest',
+        runnerClassName: 'com.example.e2e.tests.adminapp.runner.AdminAppRunCucumberTest',
         glue           : [
                 'com.example.e2e.core.hooks',
-                'com.example.e2e.tests.steps.common',
-                'com.example.e2e.tests.steps.adminapp'
+                'com.example.e2e.tests.adminapp.steps'
         ],
         parallelEnabled: false,
         parallelism    : 1
@@ -102,9 +102,28 @@ adminapp: [
 ./gradlew :test-suite:testAdminApp
 ```
 
+如果仓库运行在内网环境，且依赖需要通过公司 Maven 镜像拉取，可以加上：
+
+```bash
+./gradlew :test-suite:testAdminApp \
+  -Dmaven.repo.url=https://your-internal-maven.example.com/repository/maven-public/
+```
+
+如果不同环境首页地址不同，可以结合 `test.env` 和 app 级 homepage 参数：
+
+```bash
+./gradlew :test-suite:testAdminApp \
+  -Dtest.env=qa \
+  -Dhomepage.adminapp.qa=https://qa.adminapp.example.com \
+  -Dhomepage.adminapp=https://adminapp.example.com
+```
+
+解析优先级：`homepage.<app>.<test.env>` > `homepage.<app>` > `base.url`。
+
 如果要生成 Allure 报告：
 
 ```bash
+./gradlew :test-suite:allureDownload
 ./gradlew :test-suite:testAdminApp
 ./gradlew :test-suite:allureReport
 ```
@@ -117,12 +136,17 @@ adminapp: [
 
 注意：当前 `allureReport` / `allureServe` 默认会依赖 `testAllApps`。如果你只想看单个 app 的结果，先执行一次 `clean`，再只跑该 app task，然后再生成报告。
 
-## 7. Windows 本地浏览器约定
+`allureDownload` 现在只检查本机是否已经有可用的 Allure CLI，不会自动联网下载 `allure-generator` / `allure-commandline`。
 
-Windows 下默认开启本地浏览器模式：
+运行测试本身不依赖 Allure CLI；只有在执行 `allureReport` / `allureServe` 时，才需要通过 `-Dallure.commandline`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 提供本地 CLI。若依赖下载也要走内网镜像，可同时配置 `-Dmaven.repo.url` 或 `MAVEN_REPO_URL`。
+
+## 7. 本地浏览器约定
+
+仓库默认开启本地浏览器模式：
 
 - 自动设置 `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`
-- 默认优先使用本机 `msedge` 作为 `chromium` 通道
+- Windows 下默认优先使用本机 `msedge` 作为 `chromium` 通道
+- Linux 下默认直接跳过 E2E task
 
 如果要显式指定本地浏览器：
 
@@ -153,7 +177,7 @@ Windows 下默认开启本地浏览器模式：
 
 ## 9. 不要做的事
 
-- 不要把新 app 的步骤直接塞进 `steps/common/`。
+- 不要重新引入 `steps/common/` 或 `features/common/` 这类共享测试目录。
 - 不要复用别的 app runner 去跑新的 feature 目录。
 - 不要把 app 专属 selector 或业务词汇下沉到 `core`。
 - 不要在未验证线程安全前直接把 `parallelEnabled` 打开。

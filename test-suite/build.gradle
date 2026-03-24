@@ -1,15 +1,17 @@
 plugins {
     id 'java'
-    id 'io.qameta.allure' version '3.0.2'
 }
 
 def cucumberVersion = '7.22.1'
 def junitPlatformVersion = '1.12.2'
 def junitJupiterVersion = '5.12.2'
 def allureVersion = rootProject.ext.allureVersion
-def isWindows = System.getProperty('os.name', '').toLowerCase().contains('win')
+def osName = System.getProperty('os.name', '').toLowerCase()
+def isWindows = osName.contains('win')
+def isLinux = osName.contains('linux')
 def forwardedSystemProperties = [
         'base.url',
+        'test.env',
         'browser',
         'browser.channel',
         'browser.executable.path',
@@ -20,23 +22,12 @@ def forwardedSystemProperties = [
         'cucumber.filter.name'
 ]
 def cucumberAreas = [
-        common : [
-                taskName       : 'testCommon',
-                runnerClassName: 'com.example.e2e.tests.runner.CommonRunCucumberTest',
-                glue           : [
-                        'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common'
-                ],
-                parallelEnabled: false,
-                parallelism    : 1
-        ],
         demoapp: [
                 taskName       : 'testDemoApp',
-                runnerClassName: 'com.example.e2e.tests.runner.demoapp.DemoAppRunCucumberTest',
+                runnerClassName: 'com.example.e2e.tests.demoapp.runner.DemoAppRunCucumberTest',
                 glue           : [
                         'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common',
-                        'com.example.e2e.tests.steps.demoapp'
+                        'com.example.e2e.tests.demoapp.steps'
                 ],
                 parallelEnabled: false,
                 parallelism    : 1
@@ -47,7 +38,6 @@ dependencies {
     testImplementation platform("io.qameta.allure:allure-bom:${allureVersion}")
     testImplementation project(':core')
     testImplementation "io.qameta.allure:allure-cucumber7-jvm"
-    testImplementation "io.qameta.allure:allure-junit-platform"
     testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
     testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
     testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
@@ -59,7 +49,7 @@ def cucumberPluginValue = {
 }
 
 def localBrowserModeEnabled = {
-    Boolean.parseBoolean(System.getProperty('playwright.use.local.browser', Boolean.toString(isWindows)))
+    Boolean.parseBoolean(System.getProperty('playwright.use.local.browser', 'true'))
 }
 
 def configureSharedRuntime = { Test task, String artifactsRoot ->
@@ -95,10 +85,22 @@ def configureAreaTestTask = { Test task, String areaName, Map<String, ?> areaCon
             task.systemProperty propertyName, propertyValue
         }
     }
+    System.properties.each { propertyName, propertyValue ->
+        if (propertyName.toString().startsWith('homepage.') && propertyValue != null) {
+            task.systemProperty propertyName.toString(), propertyValue.toString()
+        }
+    }
 
     if (areaConfig.parallelEnabled) {
         task.systemProperty 'cucumber.execution.parallel.config.strategy', 'fixed'
         task.systemProperty 'cucumber.execution.parallel.config.fixed.parallelism', areaConfig.parallelism.toString()
+    }
+
+    if (isLinux) {
+        task.onlyIf {
+            logger.lifecycle("Skipping ${task.path} because local-browser mode is the default and Linux execution is disabled.")
+            false
+        }
     }
 }
 
@@ -114,16 +116,109 @@ tasks.register('testAllApps') {
     dependsOn cucumberAreas.collect { tasks.named(it.value.taskName) }
 }
 
-tasks.named('testDemoApp') {
-    shouldRunAfter tasks.named('testCommon')
+def resolveAllureExecutable = {
+    def configuredPath = System.getProperty('allure.commandline') ?: System.getenv('ALLURE_COMMANDLINE')
+    if (configuredPath) {
+        return configuredPath
+    }
+
+    def allureHome = System.getenv('ALLURE_HOME')
+    if (allureHome) {
+        return new File(allureHome, isWindows ? 'bin/allure.bat' : 'bin/allure').absolutePath
+    }
+
+    return isWindows ? 'allure.bat' : 'allure'
 }
 
-tasks.named('allureReport') {
-    dependsOn tasks.named('testAllApps')
+def allureExecutableAvailable = {
+    try {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream()
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream()
+        def result = exec {
+            commandLine resolveAllureExecutable(), '--version'
+            standardOutput = stdout
+            errorOutput = stderr
+            ignoreExitValue = true
+        }
+        return result.exitValue == 0
+    } catch (Exception ignored) {
+        return false
+    }
 }
 
-tasks.named('allureServe') {
+def allureResultsDir = layout.buildDirectory.dir('allure-results')
+def allureReportDir = layout.buildDirectory.dir('reports/allure-report')
+
+def registerOrConfigureTask = { String taskName, Closure<?> configuration ->
+    if (tasks.names.contains(taskName)) {
+        tasks.named(taskName, configuration)
+    } else {
+        tasks.register(taskName, configuration)
+    }
+}
+
+registerOrConfigureTask('allureDownload') {
+    group = 'verification'
+    description = 'Checks whether a local Allure CLI is available. No network download is performed.'
+
+    doLast {
+        if (allureExecutableAvailable()) {
+            logger.lifecycle("Using local Allure CLI at ${resolveAllureExecutable()}.")
+            return
+        }
+
+        logger.lifecycle(
+                'Allure CLI is optional and is not downloaded by this build. ' +
+                        'Set -Dallure.commandline=/path/to/allure, ALLURE_COMMANDLINE, or ALLURE_HOME when you want to run allureReport/allureServe.'
+        )
+    }
+}
+
+registerOrConfigureTask('allureReport') {
+    group = 'verification'
+    description = 'Generates an Allure HTML report when a local Allure CLI is configured.'
+    dependsOn tasks.named('allureDownload')
     dependsOn tasks.named('testAllApps')
+
+    doLast {
+        if (!allureExecutableAvailable()) {
+            throw new GradleException(
+                    'Allure CLI is not configured. ' +
+                            'Set -Dallure.commandline=/path/to/allure, ALLURE_COMMANDLINE, or ALLURE_HOME to generate the report.'
+            )
+        }
+
+        exec {
+            commandLine resolveAllureExecutable(),
+                    'generate',
+                    allureResultsDir.get().asFile.absolutePath,
+                    '--clean',
+                    '-o',
+                    allureReportDir.get().asFile.absolutePath
+        }
+    }
+}
+
+registerOrConfigureTask('allureServe') {
+    group = 'verification'
+    description = 'Serves the Allure report when a local Allure CLI is configured.'
+    dependsOn tasks.named('allureDownload')
+    dependsOn tasks.named('testAllApps')
+
+    doLast {
+        if (!allureExecutableAvailable()) {
+            throw new GradleException(
+                    'Allure CLI is not configured. ' +
+                            'Set -Dallure.commandline=/path/to/allure, ALLURE_COMMANDLINE, or ALLURE_HOME to serve the report.'
+            )
+        }
+
+        exec {
+            commandLine resolveAllureExecutable(),
+                    'serve',
+                    allureResultsDir.get().asFile.absolutePath
+        }
+    }
 }
 
 test {
@@ -142,6 +237,18 @@ test {
         def propertyValue = System.getProperty(propertyName)
         if (propertyValue != null) {
             systemProperty propertyName, propertyValue
+        }
+    }
+    System.properties.each { propertyName, propertyValue ->
+        if (propertyName.toString().startsWith('homepage.') && propertyValue != null) {
+            systemProperty propertyName.toString(), propertyValue.toString()
+        }
+    }
+
+    if (isLinux) {
+        onlyIf {
+            logger.lifecycle("Skipping ${path} because local-browser mode is the default and Linux execution is disabled.")
+            false
         }
     }
 }

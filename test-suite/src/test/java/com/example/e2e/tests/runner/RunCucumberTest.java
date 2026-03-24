@@ -1,11 +1,15 @@
 package com.example.e2e.tests.runner;
 
-import org.junit.platform.suite.api.IncludeEngines;
-import org.junit.platform.suite.api.SelectClasspathResource;
+import com.example.e2e.tests.demoapp.runner.DemoAppRunCucumberTest;
+import org.junit.platform.suite.api.SelectClasses;
 import org.junit.platform.suite.api.Suite;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 @Suite
-@IncludeEngines("cucumber")
-@SelectClasspathResource("features")
+@DisabledOnOs(OS.LINUX)
+@SelectClasses({
+        DemoAppRunCucumberTest.class
+})
 public class RunCucumberTest {
 }

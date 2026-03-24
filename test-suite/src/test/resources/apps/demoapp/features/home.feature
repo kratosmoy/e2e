@@ -5,6 +5,6 @@ Feature: Demo application home page
 
   @demoapp @smoke
   Scenario: Demo app landing page is accessible
-    Given the user opens the relative path "/"
+    Given the user opens the demoapp homepage
     Then the page title should contain "Playwright"
     And the get started link should be visible
