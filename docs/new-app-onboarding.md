@@ -126,7 +126,7 @@ adminapp: [
 
 `allureDownload` 现在只检查本机是否已经有可用的 Allure CLI，不会自动联网下载 `allure-generator` / `allure-commandline`。
 
-运行测试本身不依赖 Allure CLI；只有在执行 `allureReport` / `allureServe` 时，才需要通过 `-Dallure.commandline`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 提供本地 CLI。若依赖下载也要走内网镜像，可同时配置 `-Dmaven.repo.url` 或 `MAVEN_REPO_URL`。
+运行测试本身不依赖 Allure CLI；只有在执行 `allureReport` / `allureServe` 时，才需要通过 `-Dallure.commandline`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 提供本地 CLI。`allureDownload` 只是一个可选检查任务，不会被 `allureReport` / `allureServe` 隐式触发。若依赖下载也要走内网镜像，可同时配置 `-Dmaven.repo.url` 或 `MAVEN_REPO_URL`。
 
 ## 7. 本地浏览器约定
 

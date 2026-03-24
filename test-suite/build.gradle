@@ -163,7 +163,6 @@ tasks.register('allureDownload') {
 tasks.register('allureReport') {
     group = 'verification'
     description = 'Generates an Allure HTML report when a local Allure CLI is configured.'
-    dependsOn tasks.named('allureDownload')
     dependsOn tasks.named('testAllApps')
 
     doLast {
@@ -188,7 +187,6 @@ tasks.register('allureReport') {
 tasks.register('allureServe') {
     group = 'verification'
     description = 'Serves the Allure report when a local Allure CLI is configured.'
-    dependsOn tasks.named('allureDownload')
     dependsOn tasks.named('testAllApps')
 
     doLast {

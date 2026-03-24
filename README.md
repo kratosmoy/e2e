@@ -152,7 +152,7 @@ Windows 下常用启动方式：
 - 可以通过 `-Dallure.commandline=/path/to/allure`、`ALLURE_COMMANDLINE` 或 `ALLURE_HOME` 指定 CLI 路径
 - 如果依赖仓库也走内网镜像，可以同时使用 `-Dmaven.repo.url=...` 或 `MAVEN_REPO_URL`
 
-`allureReport` / `allureServe` 会先执行 `testAllApps`，然后在检测到本地 Allure CLI 时基于 Allure results 生成或打开报告。
+`allureDownload` 只是一个手动检查任务；`allureReport` / `allureServe` 不再隐式触发它，只会先执行 `testAllApps`，然后在检测到本地 Allure CLI 时基于 Allure results 生成或打开报告。
 
 ### 8. 在 IntelliJ + Cucumber+ 中使用
 
