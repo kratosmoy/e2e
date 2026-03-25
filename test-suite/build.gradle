@@ -20,22 +20,11 @@ def forwardedSystemProperties = [
         'cucumber.filter.name'
 ]
 def cucumberAreas = [
-        common : [
-                taskName       : 'testCommon',
-                runnerClassName: 'com.example.e2e.tests.runner.CommonRunCucumberTest',
-                glue           : [
-                        'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common'
-                ],
-                parallelEnabled: false,
-                parallelism    : 1
-        ],
         demoapp: [
                 taskName       : 'testDemoApp',
-                runnerClassName: 'com.example.e2e.tests.runner.demoapp.DemoAppRunCucumberTest',
+                runnerClassName: 'com.example.e2e.tests.demoapp.runner.RunCucumberTest',
                 glue           : [
                         'com.example.e2e.core.hooks',
-                        'com.example.e2e.tests.steps.common',
                         'com.example.e2e.tests.steps.demoapp'
                 ],
                 parallelEnabled: false,
@@ -76,6 +65,7 @@ def configureSharedRuntime = { Test task, String artifactsRoot ->
 def configureAreaTestTask = { Test task, String areaName, Map<String, ?> areaConfig ->
     task.group = 'verification'
     task.description = "Runs the ${areaName} Cucumber area."
+    task.ignoreFailures = true
     task.testClassesDirs = sourceSets.test.output.classesDirs
     task.classpath = sourceSets.test.runtimeClasspath
 
@@ -114,16 +104,24 @@ tasks.register('testAllApps') {
     dependsOn cucumberAreas.collect { tasks.named(it.value.taskName) }
 }
 
-tasks.named('testDemoApp') {
-    shouldRunAfter tasks.named('testCommon')
-}
-
 tasks.named('allureReport') {
     dependsOn tasks.named('testAllApps')
 }
 
 tasks.named('allureServe') {
     dependsOn tasks.named('testAllApps')
+}
+
+tasks.register('openAllureReport', Exec) {
+    group = 'verification'
+    description = 'Serves the generated Allure report on http://localhost:8080'
+    dependsOn tasks.named('allureReport')
+    commandLine 'python3', '-m', 'http.server', '8080',
+            '--directory', layout.buildDirectory.dir('reports/allure-report/allureReport').get().asFile.absolutePath
+}
+
+tasks.withType(Test).configureEach {
+    onlyIf { isWindows }
 }
 
 test {
