@@ -3,3 +3,4 @@ build/
 */build/
 out/
 gradle/wrapper/*.jar
+.gradle-user/
