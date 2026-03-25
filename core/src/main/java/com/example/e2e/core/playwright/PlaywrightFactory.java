@@ -43,6 +43,7 @@ public class PlaywrightFactory {
 
         Browser.NewContextOptions contextOptions = new Browser.NewContextOptions()
                 .setBaseURL(config.baseUrl())
+                .setIgnoreHTTPSErrors(true)
                 .setRecordVideoDir(config.videosDir().resolve(scenarioArtifactId))
                 .setViewportSize(1440, 900);
 
