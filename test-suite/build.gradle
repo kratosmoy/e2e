@@ -1,5 +1,5 @@
 plugins {
-    id 'io.qameta.allure' version '3.0.2' apply false
+    id 'io.qameta.allure' version '3.0.2'
 }
 
 def cucumberVersion = '7.22.1'
@@ -7,6 +7,7 @@ def junitPlatformVersion = '1.12.2'
 def junitJupiterVersion = '5.12.2'
 def allureVersion = rootProject.ext.allureVersion
 def isWindows = System.getProperty('os.name', '').toLowerCase().contains('win')
+def fullSuiteRunnerClassName = 'com.example.e2e.tests.runner.RunCucumberTest'
 def forwardedSystemProperties = [
         'base.url',
         'browser',
@@ -18,89 +19,151 @@ def forwardedSystemProperties = [
         'cucumber.filter.tags',
         'cucumber.filter.name'
 ]
-def areaAllureTasks = [
+def cucumberAreas = [
+        common : [
+                taskName       : 'testCommon',
+                taskSuffix     : 'Common',
+                baseUrl        : 'https://playwright.dev',
+                runnerClassName: 'com.example.e2e.tests.runner.CommonRunCucumberTest',
+                glue           : [
+                        'com.example.e2e.core.hooks',
+                        'com.example.e2e.tests.steps.common'
+                ],
+                parallelEnabled: false,
+                parallelism    : 1
+        ],
         demoapp: [
-                projectPath: ':test-suite:demoapp',
-                taskSuffix : 'DemoApp'
+                taskName       : 'testDemoApp',
+                taskSuffix     : 'DemoApp',
+                baseUrl        : 'https://playwright.dev',
+                runnerClassName: 'com.example.e2e.tests.runner.demoapp.DemoAppRunCucumberTest',
+                glue           : [
+                        'com.example.e2e.core.hooks',
+                        'com.example.e2e.tests.steps.common',
+                        'com.example.e2e.tests.steps.demoapp'
+                ],
+                parallelEnabled: false,
+                parallelism    : 1
         ]
 ]
 
-subprojects {
-    apply plugin: 'java'
-    apply plugin: 'io.qameta.allure'
+dependencies {
+    testImplementation platform("io.qameta.allure:allure-bom:${allureVersion}")
+    testImplementation project(':core')
+    testImplementation "io.qameta.allure:allure-cucumber7-jvm"
+    testImplementation "io.qameta.allure:allure-junit-platform"
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+    testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+}
 
-    dependencies {
-        testImplementation platform("io.qameta.allure:allure-bom:${allureVersion}")
-        testImplementation project(':core')
-        testImplementation "io.qameta.allure:allure-cucumber7-jvm"
-        testImplementation "io.qameta.allure:allure-junit-platform"
-        testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
-        testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
-        testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
-        testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+def cucumberPluginValue = 'pretty,summary,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm'
+def localBrowserModeEnabled = Boolean.parseBoolean(
+        System.getProperty('playwright.use.local.browser', Boolean.toString(isWindows))
+)
+
+def configureSharedRuntime = { Test task, String artifactsRoot ->
+    task.systemProperty 'artifacts.dir', artifactsRoot
+    task.systemProperty 'cucumber.plugin', cucumberPluginValue
+    task.systemProperty 'playwright.use.local.browser', localBrowserModeEnabled.toString()
+    task.systemProperty 'allure.results.directory', layout.buildDirectory.dir('allure-results').get().asFile.absolutePath
+    task.systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+
+    if (localBrowserModeEnabled) {
+        task.environment 'PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD', '1'
     }
+}
 
-    def cucumberPluginValue = 'pretty,summary,io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm'
-    def localBrowserModeEnabled = Boolean.parseBoolean(
-            System.getProperty('playwright.use.local.browser', Boolean.toString(isWindows))
-    )
-
-    tasks.withType(Test).configureEach { task ->
-        task.onlyIf { isWindows }
-        task.ignoreFailures = true
-
-        task.systemProperty 'artifacts.dir', layout.buildDirectory.dir('artifacts').get().asFile.absolutePath
-        task.systemProperty 'cucumber.plugin', cucumberPluginValue
-        task.systemProperty 'playwright.use.local.browser', localBrowserModeEnabled.toString()
-        task.systemProperty 'allure.results.directory', layout.buildDirectory.dir('allure-results').get().asFile.absolutePath
-        task.systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
-
-        if (localBrowserModeEnabled) {
-            task.environment 'PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD', '1'
-        }
-
-        forwardedSystemProperties.each { propertyName ->
-            def propertyValue = System.getProperty(propertyName)
-            if (propertyValue != null) {
-                task.systemProperty propertyName, propertyValue
-            }
+def forwardRuntimeProperties = { Test task ->
+    forwardedSystemProperties.each { propertyName ->
+        def propertyValue = System.getProperty(propertyName)
+        if (propertyValue != null) {
+            task.systemProperty propertyName, propertyValue
         }
     }
 }
 
-tasks.register('testAllApps') {
-    group = 'verification'
-    description = 'Runs all area-specific Cucumber tasks in parallel.'
-    dependsOn subprojects.collect { it.tasks.named('test') }
+def configureAreaTestTask = { Test task, String areaName, Map<String, ?> areaConfig ->
+    task.group = 'verification'
+    task.description = "Runs the ${areaName} Cucumber area."
+    task.testClassesDirs = sourceSets.test.output.classesDirs
+    task.classpath = sourceSets.test.runtimeClasspath
+
+    task.filter {
+        includeTestsMatching(areaConfig.runnerClassName)
+        failOnNoMatchingTests = true
+    }
+
+    def baseUrl = System.getProperty('base.url') ?: areaConfig.baseUrl
+    if (baseUrl != null) {
+        task.systemProperty 'base.url', baseUrl
+    }
+    task.systemProperty 'cucumber.glue', areaConfig.glue.join(',')
+    task.systemProperty 'cucumber.execution.parallel.enabled', areaConfig.parallelEnabled.toString()
+
+    configureSharedRuntime(task, layout.buildDirectory.dir("artifacts/${areaName}").get().asFile.absolutePath)
+    forwardRuntimeProperties(task)
+
+    if (areaConfig.parallelEnabled) {
+        task.systemProperty 'cucumber.execution.parallel.config.strategy', 'fixed'
+        task.systemProperty 'cucumber.execution.parallel.config.fixed.parallelism', areaConfig.parallelism.toString()
+    }
 }
 
-areaAllureTasks.each { areaName, config ->
-    def reportAliasTaskName = "allureReport${config.taskSuffix}"
-    def serveAliasTaskName = "allureServe${config.taskSuffix}"
+cucumberAreas.each { areaName, areaConfig ->
+    tasks.register(areaConfig.taskName, Test) { task ->
+        configureAreaTestTask(task, areaName, areaConfig)
+    }
+
+    def reportAliasTaskName = "allureReport${areaConfig.taskSuffix}"
+    def serveAliasTaskName = "allureServe${areaConfig.taskSuffix}"
     def hyphenatedReportAliasTaskName = "allureReport-${areaName}"
     def hyphenatedServeAliasTaskName = "allureServe-${areaName}"
 
     tasks.register(reportAliasTaskName) {
         group = 'verification'
-        description = "Generates the Allure report for ${areaName} only."
-        dependsOn "${config.projectPath}:allureReport"
+        description = "Runs ${areaName} and generates the Allure report."
+        dependsOn tasks.named(areaConfig.taskName)
+        finalizedBy tasks.named('allureReport')
     }
 
     tasks.register(serveAliasTaskName) {
         group = 'verification'
-        description = "Serves the Allure report for ${areaName} only."
-        dependsOn "${config.projectPath}:allureServe"
+        description = "Runs ${areaName} and serves the Allure report."
+        dependsOn tasks.named(areaConfig.taskName)
+        finalizedBy tasks.named('allureServe')
     }
 
     tasks.register(hyphenatedReportAliasTaskName) {
         group = 'verification'
         description = "Alias for ${reportAliasTaskName}."
-        dependsOn reportAliasTaskName
+        dependsOn tasks.named(reportAliasTaskName)
     }
 
     tasks.register(hyphenatedServeAliasTaskName) {
         group = 'verification'
         description = "Alias for ${serveAliasTaskName}."
-        dependsOn serveAliasTaskName
+        dependsOn tasks.named(serveAliasTaskName)
     }
+}
+
+tasks.register('testAllApps') {
+    group = 'verification'
+    description = 'Runs all area-specific Cucumber tasks.'
+    dependsOn cucumberAreas.collect { areaEntry -> tasks.named(areaEntry.value.taskName) }
+}
+
+test {
+    description = 'Runs the full Cucumber test suite.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    filter {
+        includeTestsMatching(fullSuiteRunnerClassName)
+        failOnNoMatchingTests = true
+    }
+
+    configureSharedRuntime(delegate, layout.buildDirectory.dir('artifacts/all').get().asFile.absolutePath)
+    forwardRuntimeProperties(delegate)
 }

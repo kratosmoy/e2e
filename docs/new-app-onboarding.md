@@ -76,6 +76,7 @@ public class AdminAppRunCucumberTest {
 ```groovy
 adminapp: [
         taskName       : 'testAdminApp',
+        taskSuffix     : 'AdminApp',
         runnerClassName: 'com.example.e2e.tests.runner.adminapp.AdminAppRunCucumberTest',
         glue           : [
                 'com.example.e2e.core.hooks',
@@ -90,6 +91,7 @@ adminapp: [
 规则：
 
 - `taskName` 建议统一为 `test<AppName>`。
+- `taskSuffix` 用于自动生成 `allureReport<AppName>` / `allureServe<AppName>` 这类别名任务。
 - `runnerClassName` 要写全限定名。
 - `glue` 至少包含 `core.hooks` 和自己的 steps 包。
 - 只有明确验证通过后，才把 `parallelEnabled` 改成 `true`。
@@ -115,18 +117,7 @@ adminapp: [
 ./gradlew :test-suite:allureServe
 ```
 
-如果你只想看单个 app 的 Allure 报告，建议同时注册 parent-level alias task，例如：
-
-```groovy
-def areaAllureTasks = [
-        adminapp: [
-                projectPath: ':test-suite:adminapp',
-                taskSuffix : 'AdminApp'
-        ]
-]
-```
-
-注册后可以直接运行：
+如果你只想看单个 app 的 Allure 报告，只要给该 area 配置好 `taskSuffix`，`test-suite/build.gradle` 就会自动注册别名任务。然后可以直接运行：
 
 ```bash
 ./gradlew :test-suite:allureReportAdminApp

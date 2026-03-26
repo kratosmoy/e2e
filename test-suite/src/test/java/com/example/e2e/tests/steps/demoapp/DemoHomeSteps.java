@@ -1,4 +1,4 @@
-package com.example.e2e.tests.demoapp.steps;
+package com.example.e2e.tests.steps.demoapp;
 
 import com.example.e2e.core.playwright.PlaywrightManager;
 import io.cucumber.java.en.Then;

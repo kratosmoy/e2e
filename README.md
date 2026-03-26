@@ -21,6 +21,7 @@ This is a multi-module end-to-end test automation framework built from scratch:
     ├── src/test/java/com/example/e2e/tests
     │   ├── runner
     │   │   ├── CommonRunCucumberTest.java
+    │   │   ├── RunCucumberTest.java
     │   │   └── demoapp
     │   └── steps
     │       ├── common
@@ -134,7 +135,7 @@ These tasks run their own area-specific runners and generate separate reports an
 ./gradlew :test-suite:allureServe
 ```
 
-For app-specific reports, use the parent-level aliases that forward to the corresponding child project:
+For area-specific reports, use the aliases generated from `test-suite/build.gradle`:
 
 ```bash
 ./gradlew :test-suite:allureReportDemoApp
