@@ -18,6 +18,12 @@ def forwardedSystemProperties = [
         'cucumber.filter.tags',
         'cucumber.filter.name'
 ]
+def areaAllureTasks = [
+        demoapp: [
+                projectPath: ':test-suite:demoapp',
+                taskSuffix : 'DemoApp'
+        ]
+]
 
 subprojects {
     apply plugin: 'java'
@@ -66,4 +72,35 @@ tasks.register('testAllApps') {
     group = 'verification'
     description = 'Runs all area-specific Cucumber tasks in parallel.'
     dependsOn subprojects.collect { it.tasks.named('test') }
+}
+
+areaAllureTasks.each { areaName, config ->
+    def reportAliasTaskName = "allureReport${config.taskSuffix}"
+    def serveAliasTaskName = "allureServe${config.taskSuffix}"
+    def hyphenatedReportAliasTaskName = "allureReport-${areaName}"
+    def hyphenatedServeAliasTaskName = "allureServe-${areaName}"
+
+    tasks.register(reportAliasTaskName) {
+        group = 'verification'
+        description = "Generates the Allure report for ${areaName} only."
+        dependsOn "${config.projectPath}:allureReport"
+    }
+
+    tasks.register(serveAliasTaskName) {
+        group = 'verification'
+        description = "Serves the Allure report for ${areaName} only."
+        dependsOn "${config.projectPath}:allureServe"
+    }
+
+    tasks.register(hyphenatedReportAliasTaskName) {
+        group = 'verification'
+        description = "Alias for ${reportAliasTaskName}."
+        dependsOn reportAliasTaskName
+    }
+
+    tasks.register(hyphenatedServeAliasTaskName) {
+        group = 'verification'
+        description = "Alias for ${serveAliasTaskName}."
+        dependsOn serveAliasTaskName
+    }
 }

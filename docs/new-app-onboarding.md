@@ -115,7 +115,30 @@ adminapp: [
 ./gradlew :test-suite:allureServe
 ```
 
-注意：当前 `allureReport` / `allureServe` 默认会依赖 `testAllApps`。如果你只想看单个 app 的结果，先执行一次 `clean`，再只跑该 app task，然后再生成报告。
+如果你只想看单个 app 的 Allure 报告，建议同时注册 parent-level alias task，例如：
+
+```groovy
+def areaAllureTasks = [
+        adminapp: [
+                projectPath: ':test-suite:adminapp',
+                taskSuffix : 'AdminApp'
+        ]
+]
+```
+
+注册后可以直接运行：
+
+```bash
+./gradlew :test-suite:allureReportAdminApp
+./gradlew :test-suite:allureServeAdminApp
+```
+
+如果你更喜欢连字符风格，也可以同时使用：
+
+```bash
+./gradlew :test-suite:allureReport-adminapp
+./gradlew :test-suite:allureServe-adminapp
+```
 
 ## 7. Windows 本地浏览器约定
 

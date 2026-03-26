@@ -134,7 +134,19 @@ These tasks run their own area-specific runners and generate separate reports an
 ./gradlew :test-suite:allureServe
 ```
 
-`allureReport` and `allureServe` first run `testAllApps`, then generate or open the report based on the Allure results.
+For app-specific reports, use the parent-level aliases that forward to the corresponding child project:
+
+```bash
+./gradlew :test-suite:allureReportDemoApp
+./gradlew :test-suite:allureServeDemoApp
+```
+
+The hyphenated aliases also work:
+
+```bash
+./gradlew :test-suite:allureReport-demoapp
+./gradlew :test-suite:allureServe-demoapp
+```
 
 ### 8. Use with IntelliJ + Cucumber+
 
