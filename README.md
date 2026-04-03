@@ -5,6 +5,10 @@ This is a multi-module end-to-end test automation framework built from scratch:
 - `core`: encapsulates Playwright browser initialization, shared configuration, scenario context, and Cucumber hooks.
 - `test-suite`: contains concrete business test coverage, with `steps` and `features` organized by app.
 
+## Quarterly Progress
+
+- Q1 Playwright progress summary: [summary](docs/reports/q1-playwright-progress.md) / [draw.io diagram](docs/reports/q1-playwright-progress.drawio)
+
 ## Project Structure
 
 ```text
