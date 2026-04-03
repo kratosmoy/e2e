@@ -19,7 +19,7 @@
   <text x="40" y="34" class="title">Q1 Playwright Progress</text>
 
   <rect x="40" y="56" width="390" height="504" rx="18" ry="18" fill="#edf7ea" stroke="#82b366" stroke-width="2"/>
-  <text x="60" y="88" class="lane-title">Q1 Completed Foundation</text>
+  <text x="60" y="88" class="lane-title">Completed Foundation</text>
 
   <rect x="60" y="120" width="350" height="64" class="box" fill="#f9fff7" stroke="#82b366"/>
   <text x="84" y="156" class="text">Done: Playwright session lifecycle in core</text>

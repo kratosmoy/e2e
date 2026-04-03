@@ -8,7 +8,7 @@ The editable graph is maintained in draw.io format: [q1-playwright-progress.draw
 
 The diagram uses three lanes:
 
-- `Q1 Completed Foundation`: platform capabilities already implemented in the repository
+- `Completed Foundation`: platform capabilities already implemented in the repository
 - `Current Progress`: the visible automation footprint today
 - `Next Plan`: the next milestones after the current baseline
 
@@ -44,6 +44,6 @@ Update this report whenever either of these happens:
 When refreshing the report:
 
 1. Recount the current app areas, feature files, scenarios, and runner entry points from the repository.
-2. Move completed roadmap items from the `Next Plan` section into the `Q1 Completed Foundation` or current-progress view as appropriate.
+2. Move completed roadmap items from the `Next Plan` section into the `Completed Foundation` or current-progress view as appropriate.
 3. Keep the wording focused on framework progress and coverage shape, not pass-rate or flaky-test health.
 4. Keep the draw.io layout and lane naming stable so future quarterly updates remain easy to compare.
